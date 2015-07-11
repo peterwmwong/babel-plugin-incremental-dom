@@ -1,43 +1,144 @@
+function isCompatTag(tagName) {
+  return tagName && /^[a-z]|\-/.test(tagName);
+}
+
+function cleanJSXElementLiteralChild(t, child, args) {
+  var lines = child.value.split(/\r\n|\n|\r/);
+
+  var lastNonEmptyLine = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].match(/[^ \t]/)) {
+      lastNonEmptyLine = i;
+    }
+  }
+
+  var str = "";
+
+  for (let i = 0; i < lines.length; i++) {
+    var line = lines[i];
+
+    var isFirstLine = i === 0;
+    var isLastLine = i === lines.length - 1;
+    var isLastNonEmptyLine = i === lastNonEmptyLine;
+
+    // replace rendered whitespace tabs with spaces
+    var trimmedLine = line.replace(/\t/g, " ");
+
+    // trim whitespace touching a newline
+    if (!isFirstLine) {
+      trimmedLine = trimmedLine.replace(/^[ ]+/, "");
+    }
+
+    // trim whitespace touching an endline
+    if (!isLastLine) {
+      trimmedLine = trimmedLine.replace(/[ ]+$/, "");
+    }
+
+    if (trimmedLine) {
+      if (!isLastNonEmptyLine) {
+        trimmedLine += " ";
+      }
+
+      str += trimmedLine;
+    }
+  }
+
+  if(str) {
+    args.push(
+      t.expressionStatement(
+        t.callExpression(t.identifier("text"), [t.literal(str)])
+      )
+    );
+  }
+}
+
+function buildChildren(t, node) {
+  var elems = [];
+
+  for (var i = 0; i < node.children.length; i++) {
+    var child = node.children[i];
+
+    if (t.isLiteral(child) && typeof child.value === "string") {
+      cleanJSXElementLiteralChild(t, child, elems);
+      continue;
+    }
+
+    if (t.isJSXExpressionContainer(child)) child = child.expression;
+    if (t.isJSXEmptyExpression(child)) continue;
+
+    elems.push(child);
+  }
+
+  return elems;
+}
+
 export default function ({ Plugin, types: t }) {
   return new Plugin("incremental-dom", {
     visitor: {
-      JSXOpeningElement(node) {
-        let args = [t.literal(node.name.name)];
-        let key = null;
-        let attrs = [];
+      JSXOpeningElement(node, parent) {
+        parent.children = buildChildren(t, parent);
+        let tagName = node.name.name;
 
-        for (let attr of node.attributes) {
-          if (attr.name.name === "key") {
-            key = attr.value.value;
-          } else {
-            attrs.push(
-              t.literal(attr.name.name),
-              t.literal(attr.value.value)
+        if(isCompatTag(tagName)) {
+          let args = [t.literal(node.name.name)];
+          let key = null;
+          let attrs = [];
+
+          for (let attr of node.attributes) {
+            if (attr.name.name === "key") {
+              key = attr.value.value;
+            } else {
+              attrs.push(
+                t.literal(attr.name.name),
+                t.literal(attr.value.value)
+              );
+            }
+          }
+
+          if (key || attrs.length) {
+            args.push(t.literal(key));
+          }
+
+          if (attrs.length) {
+            args.push(t.literal(null));
+            args = args.concat(attrs);
+          }
+
+          return t.expressionStatement(
+            t.callExpression(t.identifier("elementOpen"), args)
+          );
+
+        } else {
+          let customProps = [];
+          for (let attr of node.attributes) {
+            let value =
+                    t.isLiteral(attr.value)                ? t.literal(attr.value.value)
+                  : t.isJSXExpressionContainer(attr.value) ? attr.value.expression
+                  : null;
+            customProps.push(
+              t.property("init", t.identifier(attr.name.name), value)
             );
           }
-        }
+          let callArgs = customProps.length ? [t.objectExpression(customProps)] : [];
 
-        if (key || attrs.length) {
-          args.push(t.literal(key));
+          return t.expressionStatement(
+            t.callExpression(t.identifier(tagName), callArgs)
+          );
         }
-
-        if (attrs.length) {
-          args.push(t.literal(null));
-          args = args.concat(attrs);
-        }
-
-        return t.expressionStatement(
-          t.callExpression(t.identifier("elementOpen"), args)
-        );
       },
 
       JSXClosingElement(node) {
-        return t.expressionStatement(
-          t.callExpression(
-            t.identifier("elementClose"), [
-            t.literal(node.name.name)
-          ])
-        );
+        if (isCompatTag(node.name.name)) {
+          return t.expressionStatement(
+            t.callExpression(
+              t.identifier("elementClose"), [
+              t.literal(node.name.name)
+            ])
+          )
+        } else {
+          this.dangerouslyRemove();
+        }
       }
     }
   });
