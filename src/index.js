@@ -1,3 +1,6 @@
+function isCompatTag(tagName) {
+  return tagName && /^[a-z]|\-/.test(tagName);
+}
 
 function cleanJSXElementLiteralChild(t, child, args) {
   var lines = child.value.split(/\r\n|\n|\r/);
@@ -70,49 +73,72 @@ function buildChildren(t, node) {
   return elems;
 }
 
-
 export default function ({ Plugin, types: t }) {
   return new Plugin("incremental-dom", {
     visitor: {
       JSXOpeningElement(node, parent) {
         parent.children = buildChildren(t, parent);
+        let tagName = node.name.name;
 
-        let args = [t.literal(node.name.name)];
-        let key = null;
-        let attrs = [];
+        if(isCompatTag(tagName)) {
+          let args = [t.literal(node.name.name)];
+          let key = null;
+          let attrs = [];
 
-        for (let attr of node.attributes) {
-          if (attr.name.name === "key") {
-            key = attr.value.value;
-          } else {
-            attrs.push(
-              t.literal(attr.name.name),
-              t.literal(attr.value.value)
+          for (let attr of node.attributes) {
+            if (attr.name.name === "key") {
+              key = attr.value.value;
+            } else {
+              attrs.push(
+                t.literal(attr.name.name),
+                t.literal(attr.value.value)
+              );
+            }
+          }
+
+          if (key || attrs.length) {
+            args.push(t.literal(key));
+          }
+
+          if (attrs.length) {
+            args.push(t.literal(null));
+            args = args.concat(attrs);
+          }
+
+          return t.expressionStatement(
+            t.callExpression(t.identifier("elementOpen"), args)
+          );
+
+        } else {
+          let customProps = [];
+          for (let attr of node.attributes) {
+            let value =
+                    t.isLiteral(attr.value)                ? t.literal(attr.value.value)
+                  : t.isJSXExpressionContainer(attr.value) ? attr.value.expression
+                  : null;
+            customProps.push(
+              t.property("init", t.identifier(attr.name.name), value)
             );
           }
-        }
+          let callArgs = customProps.length ? [t.objectExpression(customProps)] : [];
 
-        if (key || attrs.length) {
-          args.push(t.literal(key));
+          return t.expressionStatement(
+            t.callExpression(t.identifier(tagName), callArgs)
+          );
         }
-
-        if (attrs.length) {
-          args.push(t.literal(null));
-          args = args.concat(attrs);
-        }
-
-        return t.expressionStatement(
-          t.callExpression(t.identifier("elementOpen"), args)
-        );
       },
 
       JSXClosingElement(node) {
-        return t.expressionStatement(
-          t.callExpression(
-            t.identifier("elementClose"), [
-            t.literal(node.name.name)
-          ])
-        );
+        if (isCompatTag(node.name.name)) {
+          return t.expressionStatement(
+            t.callExpression(
+              t.identifier("elementClose"), [
+              t.literal(node.name.name)
+            ])
+          )
+        } else {
+          this.dangerouslyRemove();
+        }
       }
     }
   });
