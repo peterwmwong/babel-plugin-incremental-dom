@@ -76,6 +76,10 @@ function buildChildren(t, node) {
 export default function ({ Plugin, types: t }) {
   return new Plugin("incremental-dom", {
     visitor: {
+      JSXExpressionContainer(node) {
+        return node.expression;
+      },
+
       JSXOpeningElement(node, parent) {
         parent.children = buildChildren(t, parent);
         let tagName = node.name.name;
@@ -112,12 +116,8 @@ export default function ({ Plugin, types: t }) {
         } else {
           let customProps = [];
           for (let attr of node.attributes) {
-            let value =
-                    t.isLiteral(attr.value)                ? t.literal(attr.value.value)
-                  : t.isJSXExpressionContainer(attr.value) ? attr.value.expression
-                  : null;
             customProps.push(
-              t.property("init", t.identifier(attr.name.name), value)
+              t.property("init", t.identifier(attr.name.name), attr.value)
             );
           }
           let callArgs = customProps.length ? [t.objectExpression(customProps)] : [];
