@@ -1,6 +1,10 @@
 export default function ({ Plugin, types: t }) {
   return new Plugin("incremental-dom", {
     visitor: {
+      JSXExpressionContainer(node) {
+        return node.expression;
+      },
+
       JSXOpeningElement(node) {
         let args = [t.literal(node.name.name)];
         let key = null;
@@ -8,17 +12,17 @@ export default function ({ Plugin, types: t }) {
 
         for (let attr of node.attributes) {
           if (attr.name.name === "key") {
-            key = attr.value.value;
+            key = attr.value;
           } else {
             attrs.push(
               t.literal(attr.name.name),
-              t.literal(attr.value.value)
+              attr.value
             );
           }
         }
 
         if (key || attrs.length) {
-          args.push(t.literal(key));
+          args.push(key || t.literal(null));
         }
 
         if (attrs.length) {
