@@ -1,5 +1,3 @@
 "use strict";
 
-elementOpen("div");
-  elementOpen("span");elementClose("span");
-elementClose("div");;
+elementOpen("div");elementOpen("span");elementClose("span");elementClose("div");;
