@@ -1,3 +1,4 @@
 "use strict";
 
-elementOpen("div");elementClose("div");;
+elementOpen("div");text("foo");elementClose("div");;
+elementOpen("div");text(123 + "bar");elementClose("div");;
