@@ -64,7 +64,11 @@ function buildChildren(t, node) {
       continue;
     }
 
-    if (t.isJSXExpressionContainer(child)) child = child.expression;
+    if (t.isJSXExpressionContainer(child)) {
+      child = t.expressionStatement(
+        t.callExpression(t.identifier("text"), [child])
+      );
+    }
     if (t.isJSXEmptyExpression(child)) continue;
 
     elems.push(child);
