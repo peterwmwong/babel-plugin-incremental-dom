@@ -1,3 +1,3 @@
 "use strict";
 
-elementOpen("div");elementOpen("span");elementClose("span");elementClose("div");;
+IncrementalDOM.elementOpen("div");IncrementalDOM.elementOpen("span");IncrementalDOM.elementClose("span");IncrementalDOM.elementClose("div");;

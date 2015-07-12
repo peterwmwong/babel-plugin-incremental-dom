@@ -1,3 +1,12 @@
+function callIDom(t, method, args){
+  return t.expressionStatement(
+    t.callExpression(
+      t.identifier("IncrementalDOM."+method),
+      args
+    )
+  );
+}
+
 function isCompatTag(tagName) {
   return tagName && /^[a-z]|\-/.test(tagName);
 }
@@ -46,9 +55,7 @@ function cleanJSXElementLiteralChild(t, child, args) {
 
   if(str) {
     args.push(
-      t.expressionStatement(
-        t.callExpression(t.identifier("text"), [t.literal(str)])
-      )
+      callIDom(t, "text", [t.literal(str)])
     );
   }
 }
@@ -65,9 +72,7 @@ function buildChildren(t, node) {
     }
 
     if (t.isJSXExpressionContainer(child)) {
-      child = t.expressionStatement(
-        t.callExpression(t.identifier("text"), [child])
-      );
+      child = callIDom(t, "text", [child]);
     }
     if (t.isJSXEmptyExpression(child)) continue;
 
@@ -113,9 +118,7 @@ export default function ({ Plugin, types: t }) {
             args = args.concat(attrs);
           }
 
-          return t.expressionStatement(
-            t.callExpression(t.identifier("elementOpen"), args)
-          );
+          return callIDom(t, "elementOpen", args);
 
         } else {
           let customProps = [];
@@ -134,12 +137,7 @@ export default function ({ Plugin, types: t }) {
 
       JSXClosingElement(node) {
         if (isCompatTag(node.name.name)) {
-          return t.expressionStatement(
-            t.callExpression(
-              t.identifier("elementClose"), [
-              t.literal(node.name.name)
-            ])
-          )
+          return callIDom(t, "elementClose", [t.literal(node.name.name)]);
         } else {
           this.dangerouslyRemove();
         }
