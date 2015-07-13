@@ -118,7 +118,7 @@ export default function ({ Plugin, types: t }) {
             args = args.concat(attrs);
           }
 
-          return callIDom(t, "elementOpen", args);
+          return callIDom(t, (node.selfClosing ? "elementVoid" : "elementOpen"), args);
 
         } else {
           let customProps = [];
