@@ -1,4 +1,4 @@
-function callIDom(t, method, args){
+function createCallToIncrementalDOMMethod(t, method, args){
   return t.expressionStatement(
     t.callExpression(
       t.identifier("IncrementalDOM."+method),
@@ -55,7 +55,7 @@ function cleanJSXElementLiteralChild(t, child, args) {
 
   if(str) {
     args.push(
-      callIDom(t, "text", [t.literal(str)])
+      createCallToIncrementalDOMMethod(t, "text", [t.literal(str)])
     );
   }
 }
@@ -72,7 +72,7 @@ function buildChildren(t, node) {
     }
 
     if (t.isJSXExpressionContainer(child)) {
-      child = callIDom(t, "text", [child]);
+      child = createCallToIncrementalDOMMethod(t, "text", [child]);
     }
     if (t.isJSXEmptyExpression(child)) continue;
 
@@ -118,7 +118,7 @@ export default function ({ Plugin, types: t }) {
             args = args.concat(attrs);
           }
 
-          return callIDom(t, (node.selfClosing ? "elementVoid" : "elementOpen"), args);
+          return createCallToIncrementalDOMMethod(t, (node.selfClosing ? "elementVoid" : "elementOpen"), args);
 
         } else {
           let customProps = [];
@@ -137,9 +137,30 @@ export default function ({ Plugin, types: t }) {
 
       JSXClosingElement(node) {
         if (isCompatTag(node.name.name)) {
-          return callIDom(t, "elementClose", [t.literal(node.name.name)]);
+          return createCallToIncrementalDOMMethod(t, "elementClose", [t.literal(node.name.name)]);
         } else {
           this.dangerouslyRemove();
+        }
+      },
+
+      JSXElement: {
+        exit(node) {
+          const childExpressions = node.children.reduce(
+            (acc, child)=>
+              acc.concat(child.expressions || child.expression),
+            []
+          );
+
+          const expressions = [
+            node.openingElement.expression,
+            ...childExpressions
+          ];
+
+          if(node.closingElement) {
+            expressions.push(node.closingElement.expression);
+          }
+
+          return t.sequenceExpression(expressions);
         }
       }
     }
